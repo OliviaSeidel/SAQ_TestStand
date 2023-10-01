@@ -1,6 +1,3 @@
-"""Based on 3 different input current into each channel, this outputs a plot with 16 subplots with the number of rtds
-per input current"""
-
 import matplotlib.pyplot as plt
 import ast
 import numpy as np

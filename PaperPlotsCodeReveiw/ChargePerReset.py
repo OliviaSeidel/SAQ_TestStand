@@ -92,5 +92,4 @@ plt.plot(ch, vddch, color = 'green', label = 'Vdd Value')
 plt.ylabel('Vdd (mV)')
 plt.legend(loc='upper right')
 
-#plt.errorbar(xnumRtds, y, yerr=yer, xerr=xer, fmt='o', markersize=2, linewidth=0.01, capsize=8, color='black', ecolor='red')
 plt.savefig('ChargePerReset')

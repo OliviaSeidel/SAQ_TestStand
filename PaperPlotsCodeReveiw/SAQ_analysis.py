@@ -262,7 +262,7 @@ def main(input_file, use_multithread=True):
             h.Write()
             continue
 
-        # Otherwise make a nice plot 
+        # Otherwise make a nice plot
         h, mean, sig= hist_rtd(rtd, gaussCh, setXtoTime, ch)
         hists.append(h)
 

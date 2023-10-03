@@ -240,19 +240,31 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
         background_reset_time_diffs = [[] for _ in range(16)]
         background_data = None
 
+        # Get your vdd file names
+        filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+
+        # Read the Excel file into a DataFrames
+        df = pd.read_excel(filepathVdds)
+
+        # Extract values from the second column and convert them to a list
+        vdd_list = df.iloc[:, 1].tolist()
+
         # Read in the data from the text file and populate the list
         with open(filepath, "r") as f:
             # Read the contents of the file and use 'ast.literal_eval()' to safely parse it as a Python literal
             data = ast.literal_eval(f.read())
 
             # Iterate over the elements of 'data' using enumeration
+
             for i, rtd_list in enumerate(data):
+                vddVal= vdd_list[i]
                 # Check if there are rtds, if not leave the list empty as it already is
                 if len(rtd_list) > 0:
                     # Filter out values in 'rtd_list' that are less than 0.05 because they are considered not physical
                     # rtd=0.05s means I=CV*4/rtd=(1.0E-11)*0.4v/0.05=8e-11A which is 80 pico amps, and we saw max 60 picoamps on the single channel
                     # we saw huge spikes below this threshold and thought it was due to something in the DAQ
-                    reset_time_diffs[i] = [value for value in rtd_list if value >= 0.05]
+                    reset_time_diffs[i] = [value for value in rtd_list if value >= 0.5 * vddVal]
+                    #reset_time_diffs[i] = [value for value in rtd_list if value >= 0.05 * vddVal * 1e-3*4]
 
                 else:
                     continue
@@ -290,14 +302,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 '''
         # fig.savefig(str(num))
 
-        # Get your vdd file names
-        filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
 
-        # Read the Excel file into a DataFrames
-        df = pd.read_excel(filepathVdds)
-
-        # Extract values from the second column and convert them to a list
-        vdd_list = df.iloc[:, 1].tolist()
 
 
         # Get background data if needed

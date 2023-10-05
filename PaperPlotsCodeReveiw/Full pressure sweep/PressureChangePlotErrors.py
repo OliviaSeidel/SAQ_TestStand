@@ -92,19 +92,22 @@ def calculateAreas(chstart = 0):
               [7.481, 9.994], [9.994, 12.497], [12.497, 15.023], [15.023, 19.996],
               [19.996, 24.962], [24.962, 30.026], [30.026, 39.977], [39.977, 50.065]]
 
-    # Area based on outter radius - Area based on inner radius for each channel
+    # Area based on outer radius - Area based on inner radius for each channel
     ring_areas = [round((3.14159 * (end ** 2)) - (3.14159 * (start ** 2)), 3) for start, end in minmax]
 
     #Fiducialize
     ring_areas = ring_areas[chstart:]
 
-    # x/area = c/mm^2
-    # error on this is charge/a+a(0.001) - charge/a-a(0.001) = charge *(1/a+a(0.001) - 1/a-a(0.001))
-    # sigma area error is just sigma-radius converted to area. Sigma radius is error on gerber file ruler (statistical)
-    deltaA=3.14159 * ((0.001) ** 2)
+    # Error on Q/A is in the radius measurement Q/(pi*R1^2 - pi*R2^2)
+    # Error Propagation:
+    # delta(Q/A) = sqrt([d/dR1{Q/pi*R1^2}]^2 * sigmaR1^2   +    [d/dR2{-Q/pi*R2^2}]^2 * sigmaR2^2)
+    # delta(Q/A) = sqrt([-2Q/pi*R1^3]^2 * sigmaR1^2   +    [2Q/pi*R2^3]^2 * sigmaR2^2)
+    # delta(Q/A) = (2Q/pi) * sqrt((sigmaR1^2*R2^6 + sigmaR2^2*R1^6) / (R1^6 * R2^6))
+    # delta(Q/A) = (2Q*sigmaR/pi*R1^3*R2^3) * sqrt(R2^6 + R1^6))
 
-    # Error in area normalization:
-    deltaAErr = [(1/(r_area+deltaA))-(1/(r_area-deltaA)) for r_area in ring_areas]
+    # Sigma radius is error on gerber file ruler (statistical) 0.001 mm
+    # We dont have Q here, so just do (2*sigmaR/pi*R1^3*R2^3) * sqrt(R2^6 + R1^6)) and multiply by Q later in plot def
+    deltaAErr = [(2*0.001*np.sqrt((start**6)+(end**6)))/(3.14159*(start**3)*(end**3)) for start, end in minmax]
 
     return ring_areas, deltaAErr
 
@@ -119,7 +122,7 @@ def plot(data_dict,  errorsPerPressureAbove,errorsPerPressureBelow,  save_file_n
     # Define a base list of channel numbers
     ch = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
-    # Define a base list of mm measurments, where the endpoint of each channel is between two concentric rings
+    # Define a base list of mm measurments, where the value here is the midpoint radius of each channel
     mm = [0.335, 1.028, 1.746, 2.5435, 3.493, 4.4995, 5.5045, 6.748, 8.7375, 11.2455, 13.76, 17.5095, 22.479, 27.494,
           34.0015, 44.021]
 
@@ -263,8 +266,9 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                     # Filter out values in 'rtd_list' that are less than 0.05 because they are considered not physical
                     # rtd=0.05s means I=CV*4/rtd=(1.0E-11)*0.4v/0.05=8e-11A which is 80 pico amps, and we saw max 60 picoamps on the single channel
                     # we saw huge spikes below this threshold and thought it was due to something in the DAQ
-                    reset_time_diffs[i] = [value for value in rtd_list if value >= 0.5 * vddVal]
-                    #reset_time_diffs[i] = [value for value in rtd_list if value >= 0.05 * vddVal * 1e-3*4]
+
+                    #reset_time_diffs[i] = [value for value in rtd_list if value >= 0.5 * vddVal]
+                    reset_time_diffs[i] = [value for value in rtd_list if value >= 0.05 * vddVal * 1e-3*4]
 
                 else:
                     continue
@@ -284,7 +288,10 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 reset_time_diffs[i] = [x for x in reset_time_diffs[i] if (x <= (upper_bound) and x >= lower_bound)]
 
                 # Get the weighted mean RTD
-                meanRtd=weighted_average_rtd_bins(reset_time_diffs[i])
+                # meanRtd=weighted_average_rtd_bins(reset_time_diffs[i])
+
+                # Get the regular mean
+                meanRtd = np.mean(reset_time_diffs[i])
                 meanRtdPerCh[i] = meanRtd
                 # Uncomment to take a look at your rtds for each individual channel on a different plot per pressure
                 '''
@@ -300,10 +307,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 axs[i].legend(fontsize='6')
                 axs[i].set_title("Ch{}".format(i + 1))
                 '''
-        # fig.savefig(str(num))
-
-
-
+        #fig.savefig(str(num))
 
         # Get background data if needed
         if background_subtracted:
@@ -353,11 +357,13 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                     # I = Q/t = CV*4/rtd
                     # Q = qt/rtd
                     # Now propagate the errors on rtds:
+                    # SigmaQ = sqrt[(d/dRTD[qt/meanRTD])^2 * rtdSigma^2]
                     # SigmaQ = (qt/meanRTD^2) * rtdSigma
                     systematics = ci * np.std(reset_time_diffs[i]) * deltaQ_perReset_perChannel[i] * 1800/((meanRtdPerCh[i])**2)
 
                     # Add the the one quanta error, but only to the top (You can miss extra reset if you stop in middle)
-                    errorsPerPressureAbove.append(systematics + deltaQ_perReset_perChannel[i])
+                    # Add another quanta for when you make the rtd list if there is an odd number
+                    errorsPerPressureAbove.append(systematics + 2* deltaQ_perReset_perChannel[i])
                     errorsPerPressureBelow.append(systematics)
 
             if background_subtracted:

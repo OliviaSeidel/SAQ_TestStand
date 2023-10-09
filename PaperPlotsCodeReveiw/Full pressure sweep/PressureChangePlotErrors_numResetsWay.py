@@ -3,6 +3,7 @@ import ast
 import numpy as np
 import os
 import pandas as pd
+import ROOT
 
 
 def normalize_data(data, total_max):
@@ -294,8 +295,8 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 meanRtd = np.mean(reset_time_diffs[i])
                 meanRtdPerCh[i] = meanRtd
                 # Uncomment to take a look at your rtds for each individual channel on a different plot per pressure
-                '''
-                axs[i].hist(reset_time_diffs[i], bins=50)
+
+                axs[i].hist(reset_time_diffs[i], bins=50) # loook into this function for bins
                 axs[i].axvline(q1, color='blue', linestyle='--', label='q1')
                 axs[i].axvline(q2, color='purple', linestyle='--', label='q2')
                 axs[i].axvline(q3, color='green', linestyle='--', label='q3')
@@ -306,8 +307,8 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 axs[i].set_ylabel("Frequency")
                 axs[i].legend(fontsize='6')
                 axs[i].set_title("Ch{}".format(i + 1))
-                '''
-        #fig.savefig(str(num))
+
+        fig.savefig(str(num))
 
         # Get background data if needed
         if background_subtracted:

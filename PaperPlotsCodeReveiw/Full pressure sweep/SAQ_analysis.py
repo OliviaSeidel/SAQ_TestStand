@@ -4,6 +4,8 @@ import os
 import sys
 import ROOT
 import numpy as np
+import matplotlib
+
 
 from SAQ_DAQ import N_SAQ_CHANNELS
 

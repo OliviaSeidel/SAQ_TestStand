@@ -103,20 +103,21 @@ axs = axs.ravel()
 
 for i in range(14):
     x = [0.01, 0.07, 0.1, 0.5]
-    print(i)
     y = [1 / averageRtdLists[0][i], 1 / averageRtdLists[1][i], 1 / averageRtdLists[2][i], 1 / averageRtdLists[3][i]]
-    print(y)
 
     # Perform linear regression
-    coefficients = np.polyfit(x, y, 1)
+    coefficients = np.polyfit(x, y, 1) #returns slope and y intercept of fit as coefficients[0] and coefficients[1]
+    print(1/coefficients[0])
     polynomial = np.poly1d(coefficients)
     line_of_best_fit = polynomial(x)
 
     # Plot the data points
+    axs[i].plot(x, y, 'o', label=f'ChargePerReset: {1/coefficients[0]:.4f}')
     axs[i].plot(x, y, 'o', label='Data points')
 
     # Plot the line of best fit
-    axs[i].plot(x, line_of_best_fit, label=f'Line of best fit: {coefficients[0]:.4f}x + {coefficients[1]:.4f}')
+    axs[i].plot(x, line_of_best_fit, label=f'Line of best fit: {coefficients[0]:.4f}x + {coefficients[1]:.4f} ')
+
 
     # Set labels and title for the subplot
     axs[i].set_ylabel('1/(Avg Rtd) (1/s)')

@@ -3,7 +3,24 @@ import ast
 import numpy as np
 import os
 import pandas as pd
-import ROOT
+
+def findRingMeans(chstart = 0):
+    # Wellseley areas, the start and stop of each channel where edges are between concentric rings
+    minmax = [[0.000, 0.670], [0.670, 1.386], [1.386, 2.106], [2.106, 2.981],
+              [2.981, 4.005], [4.005, 4.994], [4.994, 6.015], [6.015, 7.481],
+              [7.481, 9.994], [9.994, 12.497], [12.497, 15.023], [15.023, 19.996],
+              [19.996, 24.962], [24.962, 30.026], [30.026, 39.977], [39.977, 50.065]]
+
+
+
+    ring_avgs = [round((2/3)*(((end**3)-(start**3))/((end**2)-(start**2))), 3) for start, end in minmax]
+
+    # Fiducialize
+    ring_avgs = ring_avgs[chstart:]
+
+    return ring_avgs
+
+
 
 
 def normalize_data(data, total_max):
@@ -124,9 +141,8 @@ def plot(data_dict,  errorsPerPressureAbove,errorsPerPressureBelow,  save_file_n
     ch = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
     # Define a base list of mm measurments, where the value here is the midpoint radius of each channel
-    mm = [0.335, 1.028, 1.746, 2.5435, 3.493, 4.4995, 5.5045, 6.748, 8.7375, 11.2455, 13.76, 17.5095, 22.479, 27.494,
-          34.0015, 44.021]
-
+    #mm = [0.335, 1.028, 1.746, 2.5435, 3.493, 4.4995, 5.5045, 6.748, 8.7375, 11.2455, 13.76, 17.5095, 22.479, 27.494,34.0015, 44.021]
+    mm = findRingMeans()
     # Fiducialize the channel and mm
     mm = mm[:fiducialize_num_end]
     mm = mm[fiducialize_num_start:]
@@ -211,6 +227,8 @@ def get_filepaths(textfile, current_directory=True):
                 # Create a full path by appending 'textfile' to the subdirectory path
                 dir_path = os.path.join(dir_path, textfile)
 
+                if "pycache" in str(dir_path):
+                       continue
                 # Append the full path to the filepaths_list
                 filepaths_list.append(dir_path)
 
@@ -225,7 +243,7 @@ def get_filepaths(textfile, current_directory=True):
 def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end=16, background_subtracted=True,
                          charge_convert=True):
     """For the charge conversion, if it is true, make sure the vdd values are saved in the same directory
-     as the run1.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
+     as the run1_times.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
       from 1-16 in the second column"""
     errsAbove = []
     errsBelow = []
@@ -237,15 +255,18 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
     for filepath in filepaths:
         num += 1
 
-        # Initialize a list to hold the 16 lists of reset time differences for data
-        reset_time_diffs = [[] for _ in range(16)]
+        # Initialize a list to hold the 16 lists of total number of resets at each time (will be 12345...end)
+        totNumResets = [[] for _ in range(16)]
+
+        # Initialize a list to hold the 16 lists of time of each reset
+        timeOfResets = [[] for _ in range(16)]
 
         # Initialize a list to hold the 16 lists of reset time differences for backgrounds
         background_reset_time_diffs = [[] for _ in range(16)]
         background_data = None
 
         # Get your vdd file names
-        filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+        filepathVdds = filepath.replace('run1_times.txt', 'VddBeforeAfter.xlsx')
 
         # Read the Excel file into a DataFrames
         df = pd.read_excel(filepathVdds)
@@ -259,145 +280,51 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
             data = ast.literal_eval(f.read())
 
             # Iterate over the elements of 'data' using enumeration
-
             for i, rtd_list in enumerate(data):
-                vddVal= vdd_list[i]
+                vddVal = vdd_list[i]
                 # Check if there are rtds, if not leave the list empty as it already is
+                #rtd_list = [value for value in rtd_list if value >= 0.05 * vddVal * 1e-3 * 4]
                 if len(rtd_list) > 0:
-                    # Filter out values in 'rtd_list' that are less than 0.05 because they are considered not physical
-                    # rtd=0.05s means I=CV*4/rtd=(1.0E-11)*0.4v/0.05=8e-11A which is 80 pico amps, and we saw max 60 picoamps on the single channel
-                    # we saw huge spikes below this threshold and thought it was due to something in the DAQ
+                    # Make a list of the total number of resets (just a list from 1 to len(resets)
+                    totNumResets[i] = list(range(1, len(rtd_list) + 1))
 
-                    #reset_time_diffs[i] = [value for value in rtd_list if value >= 0.5 * vddVal]
-                    reset_time_diffs[i] = [value for value in rtd_list if value >= 0.05 * vddVal * 1e-3*4]
-
+                    totTime=0
+                    for rtd in rtd_list:
+                        totTime+=rtd  # Add the rtd to the total sum
+                        totTime+=1e-5 # Add reset dead time
+                        timeOfResets[i].append(totTime)  # Append this time
                 else:
                     continue
 
-        # Do quartile analysis to remove outliers (not doing this really hurts the error bars)
-        fig, axs = plt.subplots(4, 4, figsize=(12, 12))
+
+        # Define the number of rows and columns for subplots
+        num_rows, num_cols = 4, 4
+
+        # Create the subplots with tight layout
+        fig, axs = plt.subplots(num_rows, num_cols, figsize=(12, 12), constrained_layout=True)
+
+        # Flatten the axs array for easier iteration
         axs = axs.ravel()
-        meanRtdPerCh=[0]*(len(reset_time_diffs))
 
-        for i in range(0, len(reset_time_diffs)):
-
-            # Need to make this greater than one reset because otherwise there is a division by 0 error
-            if len(reset_time_diffs[i]) > 1:
-                q1, q2, q3, upper_bound, lower_bound = calc_quartiles_bounds(reset_time_diffs[i])
-
-                # Discard the outliers beyond the upper and lower bound (see "Test Stand Update May 26" for more info)
-                reset_time_diffs[i] = [x for x in reset_time_diffs[i] if (x <= (upper_bound) and x >= lower_bound)]
-
-                # Get the weighted mean RTD
-                # meanRtd=weighted_average_rtd_bins(reset_time_diffs[i])
-
-                # Get the regular mean
-                meanRtd = np.mean(reset_time_diffs[i])
-                meanRtdPerCh[i] = meanRtd
-                # Uncomment to take a look at your rtds for each individual channel on a different plot per pressure
-
-                axs[i].hist(reset_time_diffs[i], bins=50) # loook into this function for bins
-                axs[i].axvline(q1, color='blue', linestyle='--', label='q1')
-                axs[i].axvline(q2, color='purple', linestyle='--', label='q2')
-                axs[i].axvline(q3, color='green', linestyle='--', label='q3')
-                axs[i].axvline(upper_bound, color='black', linestyle='--', label='upper bound')
-                axs[i].axvline(lower_bound, color='yellow', linestyle='--', label='lower bound')
-                # axs[i].axvline(avgrtd, color='blue', linestyle='--')
-                axs[i].set_xlabel("rtd")
-                axs[i].set_ylabel("Frequency")
-                axs[i].legend(fontsize='6')
+        # Loop through your data
+        for i in range(0, len(timeOfResets)):
+            # Check if there is more than one reset data point to avoid division by 0 error
+            if len(timeOfResets[i]) > 1:
+                axs[i].scatter(timeOfResets[i], totNumResets[i])
+                axs[i].set_xlabel("Time (s)")
+                axs[i].set_ylabel("Total number of resets")
+                axs[i].legend(fontsize=6)
                 axs[i].set_title("Ch{}".format(i + 1))
+                if (i + 1)==7 and num==4:
+                    print(data[i])
+        pressure = filepath.split('/')[-2].split('_pos')[-1].replace('psi', '').replace('p', '.')
+        fig.suptitle('Pressure: '+str(float(pressure)* 51.715) + ' Torr', fontsize=16)
 
+        # Automatically adjust subplot spacing to prevent overlap
+        plt.tight_layout()
+
+        # Save the figure
         fig.savefig(str(num))
 
-        # Get background data if needed
-        if background_subtracted:
-            filepathBackground = filepath.replace('run1', 'background')
-            with open(filepathBackground, "r") as f:
-                data = ast.literal_eval(f.read())
-                for i, rtd_list_background in enumerate(data):
-                    if len(rtd_list_background) > 0:
-                        background_reset_time_diffs[i] = [value for value in rtd_list_background if
-                                                          value >= 0.05]  # throw out values less than this because not physical
-            # output a list of total charge seen per channel
-            totalQ_PerChannel_background = []
-
-            for i in range(0, 16):
-                totalQ_PerChannel_background.append(len(background_reset_time_diffs[i]) * deltaQ_perReset_perChannel[i])
-
-            # Feducial volume cut:
-            totalQ_PerChannel_background = totalQ_PerChannel_background[:fiducialize_num_end]
-            background_data = totalQ_PerChannel_background[fiducialize_num_start:]
-
-        # Output a list of total charge seen per channel
-        if charge_convert:
-
-            # Convert the total rtds to total charge by doing cv*num_rtds which is also deltaQ*numResets=total charge
-            # Assume c=10pF (we measured this and it was very close on all channels), take vdd and multiply times 4, convert to V
-            deltaQ_perReset_perChannel = [1.0e-11 * vdd * 4 * 1e-3 for vdd in vdd_list]
-
-            totalQ_PerChannel = []
-            errorsPerPressureAbove = []
-            errorsPerPressureBelow = []
-
-            # Only do this for the fiducial volume
-            for i in range(fiducialize_num_start, fiducialize_num_end):
-
-                #number of resets * deltaChargePerReset = total charge seen on that channel
-                totalQ_PerChannel.append(len(reset_time_diffs[i]) * deltaQ_perReset_perChannel[i])
-
-                # -------------------- Make your errors here ----------------------
-                if len(reset_time_diffs[i]) == 0:
-                    errorsPerPressureAbove.append(0)
-                    errorsPerPressureBelow.append(0)
-                else:
-                    # Determine your desired confidence interval
-                    ci = 1
-
-                    # Find your error on total Q seen:
-                    # I = Q/t = CV*4/rtd
-                    # Q = qt/rtd
-                    # Now propagate the errors on rtds:
-                    # SigmaQ = sqrt[(d/dRTD[qt/meanRTD])^2 * rtdSigma^2]
-                    # SigmaQ = (qt/meanRTD^2) * rtdSigma
-                    systematics = ci * np.std(reset_time_diffs[i]) * deltaQ_perReset_perChannel[i] * 1800/((meanRtdPerCh[i])**2)
-
-                    # Add the the one quanta error, but only to the top (You can miss extra reset if you stop in middle)
-                    # Add another quanta for when you make the rtd list if there is an odd number
-                    errorsPerPressureAbove.append(systematics + 2* deltaQ_perReset_perChannel[i])
-                    errorsPerPressureBelow.append(systematics)
-
-            if background_subtracted:
-                # Subtract background
-                totalQ_PerChannel = [(totQ - (len(background_rtd) * deltaQ)) for totQ, background_rtd, deltaQ in
-                                     zip(totalQ_PerChannel, background_reset_time_diffs, deltaQ_perReset_perChannel)]
-
-
-        # Otherwise, just do the total number of rtds
-        if not charge_convert:
-            totalQ_PerChannel = [len(rtd_list) for rtd_list in reset_time_diffs]
-
-        # For each pressure add your 16 channel list of errors
-        errsAbove.append(errorsPerPressureAbove)
-        errsBelow.append(errorsPerPressureBelow)
-
-        # Parse the pressure and feild from the headers
-        pressure = filepath.split('/')[-2].split('_')[-1].replace('psi', '').replace('p', '.')
-        field = filepath.split('/')[-2].split('_')[0].replace('vPerCm', 'V/cm')
-
-        # Add the data for this pressure/field to your dictionary with a key
-        background_dictionary[pressure + "psi" + field] = background_data
-        data_dictionary[pressure + "psi" + field] = totalQ_PerChannel
-
-    return data_dictionary, background_dictionary, errsAbove,errsBelow
-
-
-filepaths = get_filepaths('run1.txt')
-data_dict, background_dict, errorsPerPressureAbove,errorsPerPressureBelow = make_data_dictionary(filepaths, fiducialize_num_start=0,
-                                                                     fiducialize_num_end=11, background_subtracted=False,
-                                                                     charge_convert=True)
-plot(data_dict, errorsPerPressureAbove,errorsPerPressureBelow, 'AreaNormalizedChargeWithErrorsAbove1ATM.png', 'Diffusion at Various Pressures at 500V/cm',
-     fiducialize_num_start=0, fiducialize_num_end=11, area_normalize=True, plot_charge=True)
-
-# Plot background if you want:
-# plot(background_dict,errorsPerPressure,'background','Background Charge',fiducialize_num_start=0, fiducialize_num_end=9, area_normalize=False,  plot_charge=True)
+filepaths = get_filepaths('run1_times.txt')
+make_data_dictionary(filepaths, fiducialize_num_start=0,fiducialize_num_end=11, background_subtracted=False,charge_convert=True)

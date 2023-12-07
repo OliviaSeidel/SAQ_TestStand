@@ -4,6 +4,24 @@ import numpy as np
 import os
 import pandas as pd
 
+def findRingMeans(chstart = 0):
+    # Wellseley areas, the start and stop of each channel where edges are between concentric rings
+    minmax = [[0.000, 0.670], [0.670, 1.386], [1.386, 2.106], [2.106, 2.981],
+              [2.981, 4.005], [4.005, 4.994], [4.994, 6.015], [6.015, 7.481],
+              [7.481, 9.994], [9.994, 12.497], [12.497, 15.023], [15.023, 19.996],
+              [19.996, 24.962], [24.962, 30.026], [30.026, 39.977], [39.977, 50.065]]
+
+
+
+    ring_avgs = [round((2/3)*(((end**3)-(start**3))/((end**2)-(start**2))), 3) for start, end in minmax]
+
+    # Fiducialize
+    ring_avgs = ring_avgs[chstart:]
+
+    return ring_avgs
+
+
+
 
 def normalize_data(data, total_max):
     """Normalizes to a given maxiumum value, denoted by the tallest diffusion peak"""
@@ -123,9 +141,8 @@ def plot(data_dict,  errorsPerPressureAbove,errorsPerPressureBelow,  save_file_n
     ch = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
 
     # Define a base list of mm measurments, where the value here is the midpoint radius of each channel
-    mm = [0.335, 1.028, 1.746, 2.5435, 3.493, 4.4995, 5.5045, 6.748, 8.7375, 11.2455, 13.76, 17.5095, 22.479, 27.494,
-          34.0015, 44.021]
-
+    #mm = [0.335, 1.028, 1.746, 2.5435, 3.493, 4.4995, 5.5045, 6.748, 8.7375, 11.2455, 13.76, 17.5095, 22.479, 27.494,34.0015, 44.021]
+    mm = findRingMeans()
     # Fiducialize the channel and mm
     mm = mm[:fiducialize_num_end]
     mm = mm[fiducialize_num_start:]
@@ -210,6 +227,8 @@ def get_filepaths(textfile, current_directory=True):
                 # Create a full path by appending 'textfile' to the subdirectory path
                 dir_path = os.path.join(dir_path, textfile)
 
+                if "pycache" in str(dir_path):
+                       continue
                 # Append the full path to the filepaths_list
                 filepaths_list.append(dir_path)
 
@@ -224,7 +243,7 @@ def get_filepaths(textfile, current_directory=True):
 def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end=16, background_subtracted=True,
                          charge_convert=True):
     """For the charge conversion, if it is true, make sure the vdd values are saved in the same directory
-     as the run1.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
+     as the run1_times.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
       from 1-16 in the second column"""
     errsAbove = []
     errsBelow = []
@@ -244,7 +263,8 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
         background_data = None
 
         # Get your vdd file names
-        filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+
+        filepathVdds = filepath.replace('run1_times.txt', 'VddBeforeAfter.xlsx')
 
         # Read the Excel file into a DataFrames
         df = pd.read_excel(filepathVdds)
@@ -294,7 +314,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 meanRtd = np.mean(reset_time_diffs[i])
                 meanRtdPerCh[i] = meanRtd
                 # Uncomment to take a look at your rtds for each individual channel on a different plot per pressure
-
+                '''
                 axs[i].hist(reset_time_diffs[i], bins=50) # loook into this function for bins
                 axs[i].axvline(q1, color='blue', linestyle='--', label='q1')
                 axs[i].axvline(q2, color='purple', linestyle='--', label='q2')
@@ -306,8 +326,8 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
                 axs[i].set_ylabel("Frequency")
                 axs[i].legend(fontsize='6')
                 axs[i].set_title("Ch{}".format(i + 1))
-
-        fig.savefig(str(num))
+                '''
+        #fig.savefig(str(num))
 
         # Get background data if needed
         if background_subtracted:
@@ -334,7 +354,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
             # Convert the total rtds to total charge by doing cv*num_rtds which is also deltaQ*numResets=total charge
             # Assume c=10pF (we measured this and it was very close on all channels), take vdd and multiply times 4, convert to V
             deltaQ_perReset_perChannel = [1.0e-11 * vdd * 4 * 1e-3 for vdd in vdd_list]
-
+            print("deltaQ_perReset_perChannel"+str(deltaQ_perReset_perChannel))
             totalQ_PerChannel = []
             errorsPerPressureAbove = []
             errorsPerPressureBelow = []
@@ -391,7 +411,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
     return data_dictionary, background_dictionary, errsAbove,errsBelow
 
 
-filepaths = get_filepaths('run1.txt')
+filepaths = get_filepaths('run1_times.txt')
 data_dict, background_dict, errorsPerPressureAbove,errorsPerPressureBelow = make_data_dictionary(filepaths, fiducialize_num_start=0,
                                                                      fiducialize_num_end=11, background_subtracted=False,
                                                                      charge_convert=True)

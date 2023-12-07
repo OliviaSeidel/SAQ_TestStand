@@ -435,7 +435,7 @@ def get_filepaths(textfile, current_directory=True):
 def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end=16, background_subtracted=True,
                          charge_convert=True):
     """For the charge conversion, if it is true, make sure the vdd values are saved in the same directory
-     as the run1.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
+     as the run1_times.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
       from 1-16 in the second column"""
     errsAbove = []
     errsBelow = []
@@ -505,7 +505,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
         # fig.savefig(str(num))
 
         # Get your vdd file names
-        filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+        filepathVdds = filepath.replace('run1_times.txt', 'VddBeforeAfter.xlsx')
 
         # Read the Excel file into a DataFrames
         df = pd.read_excel(filepathVdds)
@@ -594,7 +594,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
     return data_dictionary, background_dictionary, errsAbove,errsBelow
 
 
-filepaths = get_filepaths('run1.txt')
+filepaths = get_filepaths('run1_times.txt')
 data_dict, background_dict, errorsPerPressureAbove,errorsPerPressureBelow = make_data_dictionary(filepaths, fiducialize_num_start=0,
                                                                      fiducialize_num_end=11, background_subtracted=False,
                                                                      charge_convert=True)

@@ -301,7 +301,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
     and parses the pressure from the name. Returns a dictionary of values to plot
 
     If charge_convert=true, make sure the vdd values are saved in the same directory
-     as the run1.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
+     as the run1_times.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
       from 1-16 in the second column"""
 
     data_dictionary = {}
@@ -349,7 +349,7 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
         if charge_convert:
 
             # get your Vdd values
-            filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+            filepathVdds = filepath.replace('run1_times.txt', 'VddBeforeAfter.xlsx')
 
             # Read the Excel file into a DataFrame
             df = pd.read_excel(filepathVdds)
@@ -384,6 +384,6 @@ def make_data_dictionary(filepaths, fiducialize_num_start=0, fiducialize_num_end
 
     return data_dictionary
 
-filepaths = get_filepaths('run1.txt')
+filepaths = get_filepaths('run1_times.txt')
 data_dict= make_data_dictionary(filepaths,fiducialize_num_start=0, fiducialize_num_end=11, charge_convert=True, removeoutliers=False)
 plot(data_dict,fiducialize_num_start=0, fiducialize_num_end=11, area_normalize=True)

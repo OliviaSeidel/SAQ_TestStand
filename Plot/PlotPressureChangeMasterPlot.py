@@ -161,7 +161,7 @@ def get_filepaths(textfile, current_directory=True):
 
 def make_data_dictionary(filepaths,  fiducialize_num=16,background_subtracted=True, charge_convert=True):
     """For the charge conversion, if it is true, make sure the vdd values are saved in the same directory
-     as the run1.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
+     as the run1_times.txt file, and in an excel sheet titled 'VddBeforeAfter.xlsx' with the Vdd values in sequential order
       from 1-16 in the second column"""
 
     data_dictionary = {}
@@ -186,7 +186,7 @@ def make_data_dictionary(filepaths,  fiducialize_num=16,background_subtracted=Tr
                     background_reset_time_diffs[i] = [value for value in rtd_list_background if
                                                       value >= 0.05]  # throw out values less than this because not physical
         if charge_convert:
-            filepathVdds = filepath.replace('run1.txt', 'VddBeforeAfter.xlsx')
+            filepathVdds = filepath.replace('run1_times.txt', 'VddBeforeAfter.xlsx')
             # Read the Excel file into a DataFrame, skip the first row with the headers
             df = pd.read_excel(filepathVdds, skiprows=1)
             # Extract values from the second column and convert them to a list
@@ -218,6 +218,6 @@ def make_data_dictionary(filepaths,  fiducialize_num=16,background_subtracted=Tr
         data_dictionary[pressure + "psi" + field] = data
     return data_dictionary
 
-filepaths = get_filepaths('run1.txt')
+filepaths = get_filepaths('run1_times.txt')
 data_dict = make_data_dictionary(filepaths, fiducialize_num=11, charge_convert=True)
 plot(data_dict,'diffusion','Charge over 5 Minute run', fiducialize_num=11, area_normalize=True, peak_normalize=True, plot_charge=True)
